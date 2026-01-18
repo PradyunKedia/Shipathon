@@ -1,303 +1,180 @@
 import streamlit as st
-import pandas as pd
 import pickle
-import re
 from pathlib import Path
 
 # ============================================================
 # PAGE CONFIG
 # ============================================================
 st.set_page_config(
-    page_title="WhatsApp House Classifier",
-    page_icon="🏠",
-    layout="wide"
+    page_title="🎵 Genre Predictor",
+    page_icon="🎧",
+    layout="centered"
 )
 
 # ============================================================
-# ADVANCED COLORFUL CSS
+# FUN + DYNAMIC CSS
 # ============================================================
 st.markdown("""
 <style>
 
-/* ---------- Background ---------- */
+/* ===== ANIMATED BACKGROUND ===== */
 .stApp {
-    background: radial-gradient(circle at top left, #1a1a40, #0f0f1a);
+    background: linear-gradient(
+        -45deg,
+        #ff4ecd,
+        #6a5cff,
+        #00e5ff,
+        #7f00ff
+    );
+    background-size: 400% 400%;
+    animation: bgMove 18s ease infinite;
     color: white;
 }
 
-/* ---------- Container ---------- */
-.block-container {
-    padding-top: 2rem;
+@keyframes bgMove {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
 }
 
-/* ---------- Title ---------- */
+/* ===== PAGE ENTER ===== */
+.block-container {
+    animation: slideUp 1s ease forwards;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(25px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== TITLE ===== */
 h1 {
     text-align: center;
-    font-size: 3.2rem;
+    font-size: 3.4rem;
     font-weight: 900;
-    background: linear-gradient(90deg, #ff4ecd, #6a5cff, #00e5ff);
+    background: linear-gradient(90deg, #fff, #ffe259, #ffa751);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    text-shadow: 0 0 40px rgba(255, 78, 205, 0.4);
+    animation: glow 2.5s infinite alternate;
 }
 
-/* ---------- Subtitles ---------- */
-h2, h3 {
-    color: #ffffff;
-    text-shadow: 0 0 15px rgba(255,255,255,0.25);
+@keyframes glow {
+    from { text-shadow: 0 0 10px rgba(255,255,255,0.5); }
+    to   { text-shadow: 0 0 35px rgba(255,255,255,0.9); }
 }
 
-/* ---------- Glass Card ---------- */
+/* ===== GLASS CARD ===== */
 .glass {
-    background: rgba(255,255,255,0.12);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border-radius: 20px;
+    background: rgba(255,255,255,0.18);
+    backdrop-filter: blur(18px);
+    border-radius: 24px;
     padding: 1.6rem;
-    box-shadow: 0 15px 40px rgba(0,0,0,0.45);
-    border: 1px solid rgba(255,255,255,0.15);
+    box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+    transition: transform 0.35s ease, box-shadow 0.35s ease;
 }
 
-/* ---------- Metrics ---------- */
-.metric-value {
-    font-size: 2.6rem;
-    font-weight: 800;
+.glass:hover {
+    transform: translateY(-8px) scale(1.03);
+    box-shadow: 0 40px 90px rgba(0,0,0,0.7);
 }
 
-.metric-label {
-    letter-spacing: 1.4px;
-    opacity: 0.85;
+/* ===== TEXT AREA ===== */
+textarea {
+    border-radius: 18px !important;
+    font-size: 1.05rem !important;
 }
 
-/* ---------- File uploader ---------- */
-section[data-testid="stFileUploader"] {
-    background: linear-gradient(135deg, #ff4ecd, #6a5cff);
-    padding: 1.5rem;
-    border-radius: 22px;
-    color: white;
-    box-shadow: 0 0 45px rgba(255, 78, 205, 0.5);
+/* ===== BUTTON ===== */
+button[kind="primary"] {
+    background: linear-gradient(90deg, #ffe259, #ffa751) !important;
+    color: #1a1a1a !important;
+    border-radius: 999px !important;
+    font-weight: 900 !important;
+    padding: 0.65rem 1.8rem !important;
+    animation: pulse 2s infinite;
 }
 
-/* ---------- Table ---------- */
-table {
-    background: rgba(255,255,255,0.95);
-    border-radius: 18px;
-    overflow: hidden;
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(255,226,89,0.7); }
+    70% { box-shadow: 0 0 0 26px rgba(255,226,89,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,226,89,0); }
 }
 
-/* ---------- House Pills ---------- */
-.house {
-    padding: 7px 16px;
-    border-radius: 999px;
-    font-weight: 800;
-    color: white;
-    display: inline-block;
-    text-shadow: 0 0 8px rgba(0,0,0,0.35);
+/* ===== RESULT FLOAT ===== */
+.result {
+    font-size: 2.4rem;
+    font-weight: 900;
+    animation: float 3s ease-in-out infinite;
 }
 
-.gryffindor { background: linear-gradient(90deg, #ff512f, #dd2476); }
-.slytherin  { background: linear-gradient(90deg, #11998e, #38ef7d); }
-.ravenclaw  { background: linear-gradient(90deg, #396afc, #2948ff); }
-.hufflepuff { background: linear-gradient(90deg, #f7971e, #ffd200); }
-
-/* ---------- Divider ---------- */
-hr {
-    border: none;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, #6a5cff, transparent);
-    margin: 2.5rem 0;
+@keyframes float {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-12px); }
 }
 
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# LOAD MODEL + VECTORIZER
+# LOAD MODEL SAFELY
 # ============================================================
-MODEL_PATH = Path(__file__).parent / "house_classifier.pkl"
+MODEL_PATH = Path(__file__).parent / "genre_classifier.pkl"
 
 @st.cache_resource
 def load_model():
+    if not MODEL_PATH.exists():
+        return None, None
     with open(MODEL_PATH, "rb") as f:
         return pickle.load(f)
 
 model, tfidf = load_model()
 
 # ============================================================
-# NLP PREPROCESSING
+# UI
 # ============================================================
-import nltk
-from nltk.corpus import stopwords
-from nltk.tokenize import word_tokenize
-from nltk.stem import PorterStemmer
+st.title("🎵 Feel the Lyrics. Name the Genre.")
 
-stemmer = PorterStemmer()
-stop_words = set(stopwords.words("english"))
-
-def preprocess(text):
-    tokens = word_tokenize(text.lower())
-    tokens = [w for w in tokens if w.isalnum() and w not in stop_words]
-    tokens = [stemmer.stem(w) for w in tokens]
-    return " ".join(tokens)
-
-# ============================================================
-# WHATSAPP CHAT PARSER
-# ============================================================
-def parse_whatsapp_chat(uploaded_file):
-    uploaded_file.seek(0)
-    text = uploaded_file.read().decode("utf-8", errors="ignore")
-
-    pattern = re.compile(
-        r"^(\d{1,2}/\d{1,2}/\d{2,4}),\s(\d{1,2}:\d{2}(?:\s?[AP]M)?)\s-\s([^:]+):\s(.*)"
-    )
-
-    data = []
-    current_speaker = None
-    current_message = ""
-
-    for line in text.splitlines():
-        match = pattern.match(line)
-        if match:
-            if current_speaker and current_message:
-                data.append((current_speaker, current_message.strip()))
-            current_speaker = match.group(3).strip()
-            current_message = match.group(4).strip()
-        else:
-            if current_speaker:
-                current_message += " " + line.strip()
-
-    if current_speaker and current_message:
-        data.append((current_speaker, current_message.strip()))
-
-    df = pd.DataFrame(data, columns=["speaker_first_name", "message"])
-
-    df = df[
-        (~df["message"].str.contains("<Media omitted>", na=False)) &
-        (~df["speaker_first_name"].str.contains("WhatsApp", na=False))
-    ]
-
-    return df
-
-# ============================================================
-# HEADER
-# ============================================================
-st.title("🏠 WhatsApp House Classifier")
-st.markdown("""
-<p style="text-align:center; font-size:1.15rem; opacity:0.85;">
-Upload a WhatsApp chat and reveal everyone’s true house ✨
-</p>
-""", unsafe_allow_html=True)
+if model is None:
+    st.error("❌ Model not found. Run `python ML.py` first.")
+    st.stop()
 
 st.markdown("""
 <div class="glass" style="text-align:center;">
-📤 <b>How to use</b><br><br>
-Export WhatsApp chat → <b>WITHOUT media</b> → Upload the <code>.txt</code> file
+🎤 <b>Drop the lyrics.</b><br>
+🎧 <span style="opacity:0.9;">We’ll decode the vibe and call the genre.</span>
 </div>
 """, unsafe_allow_html=True)
+
+lyrics = st.text_area(
+    "🎶 Lyrics go here",
+    height=240,
+    placeholder=(
+        "The bass hits low, the crowd goes wild,\n"
+        "Lost in rhythm, heart untamed...\n\n"
+        "Paste any lyrics — chorus, verse, or chaos."
+    )
+)
 
 st.write("")
 
 # ============================================================
-# FILE UPLOADER
+# PREDICTION
 # ============================================================
-uploaded_file = st.file_uploader(
-    "Upload WhatsApp chat (.txt)",
-    type="txt"
-)
+if st.button("🔮 Reveal the Genre"):
+    if not lyrics.strip():
+        st.info("🎶 Give me some lyrics first.")
+    else:
+        try:
+            vec = tfidf.transform([lyrics])
+            prediction = model.predict(vec)[0]
 
-# ============================================================
-# MAIN LOGIC
-# ============================================================
-if uploaded_file:
-    chat_df = parse_whatsapp_chat(uploaded_file)
+            st.markdown(f"""
+            <div class="glass" style="text-align:center; margin-top:1.8rem;">
+                <p style="letter-spacing:2px; opacity:0.8;">THE VIBE FEELS LIKE</p>
+                <div class="result">🎧 {prediction.upper()}</div>
+                <p style="opacity:0.85;">Turn the volume up.</p>
+            </div>
+            """, unsafe_allow_html=True)
 
-    if chat_df.empty:
-        st.error("No messages could be parsed.")
-        st.stop()
-
-    # Group messages by user
-    chat_user = (
-        chat_df
-        .groupby("speaker_first_name")["message"]
-        .apply(" ".join)
-        .reset_index()
-    )
-
-    # Preprocess
-    chat_user["clean_text"] = chat_user["message"].apply(preprocess)
-    chat_user = chat_user[chat_user["clean_text"].str.strip() != ""]
-
-    if chat_user.empty:
-        st.error("No usable text after preprocessing.")
-        st.stop()
-
-    # Predict
-    X_new = tfidf.transform(chat_user["clean_text"])
-    chat_user["predicted_house"] = model.predict(X_new)
-
-    dominant_house = chat_user["predicted_house"].value_counts().idxmax()
-
-    # ========================================================
-    # METRICS
-    # ========================================================
-    c1, c2, c3 = st.columns(3)
-
-    with c1:
-        st.markdown(f"""
-        <div class="glass">
-            <div class="metric-value">👥 {len(chat_user)}</div>
-            <div class="metric-label">USERS</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with c2:
-        st.markdown(f"""
-        <div class="glass">
-            <div class="metric-value">💬 {len(chat_df)}</div>
-            <div class="metric-label">MESSAGES</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with c3:
-        st.markdown(f"""
-        <div class="glass">
-            <div class="metric-value">🏆 {dominant_house}</div>
-            <div class="metric-label">DOMINANT HOUSE</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    st.markdown("<hr>", unsafe_allow_html=True)
-
-    # ========================================================
-    # HOUSE STYLING
-    # ========================================================
-    def style_house(house):
-        h = house.lower()
-        return f'<span class="house {h}">🪄 {house}</span>'
-
-    chat_user["pretty_house"] = chat_user["predicted_house"].apply(style_house)
-
-    # ========================================================
-    # RESULTS TABLE
-    # ========================================================
-    st.subheader("🧙 User House Predictions")
-
-    pretty_df = chat_user[["speaker_first_name", "pretty_house"]].rename(
-        columns={
-            "speaker_first_name": "User",
-            "pretty_house": "House"
-        }
-    )
-
-    st.markdown(
-        pretty_df.to_html(escape=False, index=False),
-        unsafe_allow_html=True
-    )
-
-    st.markdown("<hr>", unsafe_allow_html=True)
-
-    # ========================================================
-    # HOUSE DISTRIBUTION
-    # ========================================================
-    st.subheader("📊 House Distribution")
-    st.bar_chart(chat_user["predicted_house"].value_counts())
+        except Exception:
+            st.error("⚠️ Could not classify these lyrics. Try a longer sample.")
